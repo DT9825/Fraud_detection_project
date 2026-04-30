@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>智鉴·网盾 | 自动化风险审计平台</title>
+    <script src="https://cdn.staticfile.net/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdn.staticfile.net/marked/4.3.0/marked.min.js"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            /* 现代化极客暗色模式 (Sleek Dark) */
+            --vscode-bg: #0d1117;
+            --vscode-side: #161b22;
+            --vscode-header: #010409;
+            --vscode-accent: #58a6ff;
+            --vscode-text: #c9d1d9;
+            --vscode-text-secondary: #8b949e;
+            --ds-ai-bg: #161b22;
+            --ds-user-bg: #21262d;
+            --danger: #f85149;
+            --success: #3fb950;
+            --warning: #d29922;
+            --editor-bg: #0d1117;
+            --border-color: #30363d;
+            --agent-bg: #161b22;
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.6);
+        }
+
+        [data-theme='light'] {
+            /* Material for MkDocs - Light Mode (OI-Wiki 风格) */
+            --vscode-bg: #ffffff;
+            --vscode-side: #f5f5f5;
+            --vscode-header: #3f51b5;
+            --vscode-accent: #00bcd4;
+            --vscode-text: #263238;
+            --vscode-text-secondary: #546e7a;
+            --ds-ai-bg: #e8f4f8;
+            --ds-user-bg: #f1f5f9;
+            --danger: #e53935;
+            --success: #43a047;
+            --warning: #fb8c00;
+            --editor-bg: #fafbfc;
+            --border-color: #eceff1;
+            --agent-bg: #f0f2f5;
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.12);
+        }
+
+        [data-theme='pearl'] {
+            /* 珍珠白配色 (Pearl White) */
+            --vscode-bg: #fcfbf9;
+            --vscode-side: #f5f4f0;
+            --vscode-header: #eae8e1;
+            --vscode-accent: #607d8b;
+            --vscode-text: #4a4a4a;
+            --vscode-text-secondary: #808080;
+            --ds-ai-bg: #f0eee9;
+            --ds-user-bg: #e6e4df;
+            --danger: #d32f2f;
+            --success: #388e3c;
+            --warning: #f57c00;
+            --editor-bg: #fcfbf9;
+            --border-color: #dfddd5;
+            --agent-bg: #f5f4f0;
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--vscode-bg); color: var(--vscode-text); font-family: 'Roboto', 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; letter-spacing: 0.3px; overflow: hidden; }
+
+        /* 全局布局 */
+        .app-container { display: grid; grid-template-rows: 45px 80px 1fr; height: 100vh; }
+
+        /* 顶部菜单栏 */
+        .top-nav { background: var(--vscode-header); color: var(--vscode-text); display: flex; align-items: center; padding: 0 20px; font-size: 14px; gap: 20px; border-bottom: 2px solid var(--vscode-accent); box-shadow: var(--shadow-md); transition: background 0.3s; }
+        [data-theme='light'] .top-nav { color: #fff; }
+        .top-nav span { cursor: pointer; transition: opacity 0.2s; }
+        .top-nav span:hover { opacity: 0.8; }
+
+        /* 统计状态栏 */
+        .stats-bar { background: var(--vscode-bg); display: flex; align-items: center; justify-content: space-around; border-bottom: 1px solid var(--border-color); gap: 20px; padding: 0 10px;}
+        .stat-item { text-align: center; padding: 8px 0;}
+        .stat-label { font-size: 12px; color: var(--vscode-text-secondary); text-transform: uppercase; font-weight: 500; }
+        .stat-value { font-size: 22px; font-weight: 600; color: var(--vscode-accent); font-family: 'Roboto Mono', monospace; }
+        .stat-value.danger { color: var(--danger); }
+
+        /* 三栏布局 */
+        .main-content { display: grid; grid-template-columns: 280px 1fr 400px; overflow: hidden; height: 100%; }
+
+        /* 左侧：报警流 */
+        .sidebar { background: var(--vscode-side); border-right: 2px solid var(--border-color); display: flex; flex-direction: column; transition: background 0.3s; overflow: hidden; min-height: 0;}
+        .sidebar-header { padding: 12px 15px; font-size: 12px; font-weight: 600; color: var(--vscode-accent); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(90deg, rgba(0, 188, 212, 0.1) 0%, rgba(0, 188, 212, 0.02) 100%); text-transform: uppercase; letter-spacing: 0.5px; flex: none;}
+        .alert-list { flex: 1; overflow-y: auto; }
+        .alert-item { padding: 12px 15px; font-size: 13px; border-left: 4px solid transparent; cursor: pointer; transition: all 0.3s ease; border-bottom: 1px solid var(--border-color); background: var(--vscode-side); }
+        .alert-item:hover { background: rgba(0, 188, 212, 0.08); border-left-color: var(--vscode-accent); }
+        .alert-item.active { background: rgba(0, 188, 212, 0.15); border-left-color: var(--vscode-accent); color: var(--vscode-accent); }
+        .alert-item .id { font-weight: 600; font-family: 'Roboto Mono', monospace; }
+        .alert-item .tag-normal { font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(67, 160, 71, 0.15); color: var(--success); border: 1px solid rgba(67, 160, 71, 0.3); }
+        .alert-item .tag { font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(229, 57, 53, 0.15); color: var(--danger); border: 1px solid rgba(229, 57, 53, 0.3); }
+        .alert-time { font-size: 11px; color: var(--vscode-text-secondary); margin-top: 6px; display:flex; align-items:center; gap:4px; }
+
+        /* 中间：多标签工作区 */
+        .editor-area { position: relative; background: var(--editor-bg); display: flex; flex-direction: column; transition: background 0.3s; }
+        .editor-tabs { background: var(--vscode-side); height: 40px; display: flex; align-items: center; border-bottom: 1px solid var(--border-color); }
+        .tab { padding: 0 15px; font-size: 13px; height: 100%; display: flex; align-items: center; border-right: 1px solid var(--border-color); border-top: 3px solid transparent; user-select: none; color: var(--vscode-text-secondary); transition: all 0.3s ease;}
+        .tab.active { background: var(--editor-bg); color: var(--vscode-accent); border-top-color: var(--vscode-accent); font-weight: 600; }
+        .tab:hover:not(.active) { cursor: pointer; color: var(--vscode-text); background: rgba(0, 188, 212, 0.05); }
+        
+        .view-content { flex: 1; padding: 20px; overflow-y: auto; box-sizing: border-box; }
+        
+        /* Dashboard 视图独占样式 */
+        .chart-card { background: var(--editor-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 20px; margin-bottom: 20px; display: flex; flex-direction: column; box-shadow: var(--shadow-sm); transition: all 0.3s ease; }
+        .chart-card:hover { box-shadow: var(--shadow-md); border-color: var(--vscode-accent); }
+        .chart-card h3 { margin: 0 0 15px 0; font-size: 15px; color: var(--vscode-accent); padding-bottom: 10px; border-bottom: 2px solid var(--vscode-accent); font-weight: 600; letter-spacing: 0.2px;}
+        
+        #graph-container { width: 100%; height: 100%; display: block; border-radius: 6px; overflow: hidden; box-shadow: var(--shadow-sm); }
+
+        /* 右侧：AI Copilot */
+        .copilot-panel { background: var(--vscode-bg); border-left: 2px solid var(--border-color); display: flex; flex-direction: column; transition: background 0.3s; }
+        .chat-header { padding: 15px; border-bottom: 2px solid var(--border-color); font-weight: 600; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(0, 188, 212, 0.1) 0%, rgba(0, 188, 212, 0.02) 100%); color: var(--vscode-accent); letter-spacing: 0.3px;}
+        .chat-header i { color: var(--vscode-accent); }
+        .chat-content { flex: 1; overflow-y: auto; padding: 20px; font-size: 14px; }
+        
+        .agent-thought { background: var(--agent-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--vscode-accent); border-radius: 4px; padding: 12px; margin-bottom: 20px; font-size: 12px; font-family: 'Roboto Mono', monospace; color: var(--vscode-text-secondary); line-height: 1.5; }
+        .ai-message { background: var(--ds-ai-bg); padding: 15px 20px; border-radius: 6px; line-height: 1.7; margin-bottom: 20px; color: var(--vscode-text); border: 1px solid rgba(0, 188, 212, 0.2); box-shadow: var(--shadow-sm); }
+        
+        .action-zone { padding: 20px; border-top: 1px solid var(--border-color); background: var(--vscode-side); }
+        .btn-execute { width: 100%; padding: 12px; background: var(--danger); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: var(--shadow-sm); transition: background 0.2s; letter-spacing: 0.5px;}
+        .btn-execute:hover { background: #c62828; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--vscode-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 6px;}
+        ::-webkit-scrollbar-thumb:hover { background: var(--vscode-accent); }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <nav class="top-nav">
+        <i class="fa-solid fa-shield-halved" style="color:var(--vscode-accent)"></i>
+        <span style="font-weight:bold">智鉴·网盾 v2.0 (一体化监控中心)</span>
+        <span onclick="exportReport()" title="导出高危拦截记录"><i class="fa-solid fa-file-export"></i> 文件</span>
+        <span onclick="toggleMonitor()" id="menu-monitor" title="暂停/启动全局扫描"><i class="fa-solid fa-pause"></i> 监控(扫描中)</span>
+        <span onclick="alert('系统提示：正在尝试拉起 SSH 后端终端... \n(该功能仍在完善中)')" title="打开底层控制台"><i class="fa-solid fa-terminal"></i> 终端</span>
+        <span onclick="alert('智鉴·网盾 v2.0\\n基于大模型(Qwen)与图神经网络的实时反欺诈审计系统。\\n此为计算机设计大赛展示 Demo。')"><i class="fa-solid fa-circle-info"></i> 帮助</span>
+        <span style="margin-left:auto; margin-right:15px; cursor:pointer;" onclick="toggleTheme()" id="theme-btn"><i class="fa-solid fa-sun"></i> 切换主题</span>
+    </nav>
+
+    <section class="stats-bar">
+        <div class="stat-item"><div class="stat-label">数据集总吞吐量</div><div class="stat-value" id="stat-total">0</div></div>
+        <div class="stat-item"><div class="stat-label">AI 引擎极速审单率</div><div class="stat-value" id="stat-rate" style="color:#00d2ff">99.98%</div></div>
+        <div class="stat-item"><div class="stat-label">拦截极高危资金</div><div class="stat-value danger" id="stat-amt">¥ 0.00</div></div>
+        <div class="stat-item"><div class="stat-label">GNN 发现活跃黑产节点</div><div class="stat-value" id="stat-nodes">0</div></div>
+    </section>
+
+    <main class="main-content">
+        <!-- 左侧报警记录流 -->
+        <aside class="sidebar">
+            <div class="sidebar-header" style="cursor:pointer;" onclick="togglePinned()">
+                <span>🚨 锁定高危目标 (需审计)</span>
+                <i class="fa-solid fa-chevron-up" id="pinned-icon"></i>
+            </div>
+            <div class="alert-list" id="pinned-list" style="max-height: 40%; flex: none; border-bottom: 2px solid var(--border-color); overflow-y: auto;"></div>
+
+            <div class="sidebar-header" style="border-top: none;">
+                <span>📡 全局实时防线</span>
+                <i class="fa-solid fa-satellite-dish" style="color:var(--success, #89d185); animation: blink 1s infinite;"></i>
+            </div>
+            <div class="alert-list" id="stream-list" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0;"></div>
+        </aside>
+
+        <!-- 中间多标签代码编辑器区域 -->
+        <section class="editor-area">
+            <div class="editor-tabs">
+                <div class="tab active" id="tab-dashboard" onclick="switchTab('dashboard')">
+                    <i class="fa-solid fa-chart-line" style="margin-right:5px"></i> 全局态势监测.view
+                </div>
+                <div class="tab" id="tab-graph" onclick="switchTab('graph')" style="display:none;">
+                    <i class="fa-solid fa-diagram-project" style="margin-right:5px"></i> <span id="graph-tab-title">溯源分图.gnn</span>
+                </div>
+            </div>
+
+            <!-- Tab 1: Dashboard 数据盘 -->
+            <div class="view-content" id="view-dashboard" style="display:flex; flex-direction:column;">
+                <div class="chart-card" style="flex:1;">
+                    <h3>🔌 网络流量频次波动监控</h3>
+                    <div id="line-chart" style="width:100%; height:100%; min-height: 200px;"></div>
+                </div>
+                <div class="chart-card" style="flex:1;">
+                    <h3>📡 暗网节点拓扑雷达</h3>
+                    <div id="globe-chart" style="width:100%; height:100%; min-height: 250px;"></div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Graph 溯源图 -->
+            <div class="view-content" id="view-graph" style="display:none; padding:0;">
+                <div id="graph-container"></div>
+            </div>
+        </section>
+
+        <!-- 右侧 AI 研判结果 -->
+        <aside class="copilot-panel">
+            <div class="chat-header">
+                <div><i class="fa-solid fa-robot"></i> Copilot 审计助手</div>
+            </div>
+            <div class="chat-content" id="chat-window">
+                <div style="color:#555; text-align:center; margin-top:50px;">
+                    <i class="fa-regular fa-compass" style="font-size:24px; margin-bottom:10px;"></i><br>
+                    监控进行中，请在左侧拦截流中选择挂起订单启动深度调查
+                </div>
+            </div>
+            <div class="action-zone" id="action-zone" style="display:none">
+                <button class="btn-execute" onclick="executeBlock()">执行 AI 阻断指令</button>
+            </div>
+        </aside>
+    </main>
+</div>
+
+<style>
+    @keyframes blink { 50% { opacity: 0.5; } }
+    
+    /* AI阻断终端动画层样式 */
+    #kill-chain-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.85); z-index: 9999;
+        display: flex; justify-content: center; align-items: center;
+        backdrop-filter: blur(4px);
+    }
+    .kill-modal {
+        background: #111; border: 1px solid var(--danger); box-shadow: 0 0 25px rgba(229,57,53,0.4);
+        width: 650px; padding: 25px; border-radius: 6px;
+        font-family: 'Consolas', 'Courier New', monospace;
+    }
+    .kill-console {
+        background: #000; color: #0f0; padding: 15px; height: 220px;
+        overflow-y: auto; border-radius: 4px; font-size: 14px;
+        border: 1px solid #333; margin-top: 15px; margin-bottom: 20px;
+        box-shadow: inset 0 0 10px rgba(0,255,0,0.1);
+    }
+    .kill-console div { padding: 4px 0; border-bottom: 1px dashed rgba(0,255,0,0.2); }
+</style>
+
+<script>
+    // ----------- 1. 实例化图表 -----------
+    const lineChart = echarts.init(document.getElementById('line-chart'));
+    const globeChart = echarts.init(document.getElementById('globe-chart'));
+    const graphChart = echarts.init(document.getElementById('graph-container'));
+    let allNodes = [], allLinks = [];
+
+    // [动态更新] 折线图：网络流量频次
+    let timeData = (function (){
+        let res = [];
+        let t = new Date();
+        for(let i=0; i<15; i++) {
+            res.unshift(t.toLocaleTimeString('en-US',{hour12:false}));
+            t.setSeconds(t.getSeconds() - 2);
+        }
+        return res;
+    })();
+    let trafficData = Array.from({length: 15}, () => Math.floor(Math.random() * 5));
+
+    lineChart.setOption({
+        tooltip: { trigger: 'axis' }, grid: { left: '10%', right: '5%', bottom: '15%', top: '10%' },
+        xAxis: { type: 'category', data: timeData, axisLabel: { color: '#888' } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#333' } }, axisLabel: { color: '#888' } },
+        series: [{ data: trafficData, type: 'line', smooth: true, itemStyle: { color: '#00bcd4' }, areaStyle: { color: 'rgba(0, 188, 212, 0.2)' } }]
+    });
+
+    // [动态更新] 雷达拓扑图：暗网活跃黑产节点网络
+    const genData = () => Array.from({length: 80}, () => [Math.random()*100, Math.random()*100, Math.random()*20]);
+    let radarNodes = [];
+    let radarLinks = [];
+    
+    globeChart.setOption({
+        xAxis: {show: false, max: 100}, yAxis: {show: false, max: 100},
+        series: [
+            // 背景正常底噪流量池
+            { type: 'scatter', symbolSize: v => v[2]/4, itemStyle: {color: 'rgba(96, 125, 139, 0.3)'}, data: genData() },
+            // 黑产节点追踪图谱网
+            { 
+                type: 'graph', 
+                coordinateSystem: 'cartesian2d',
+                data: radarNodes, 
+                links: radarLinks,
+                edgeSymbol: ['none', 'arrow'],
+                edgeSymbolSize: [4, 8],
+                label: { show: true, position: 'right', formatter: '{b}', fontSize: 9, color: 'inherit' },
+                itemStyle: { color: '#e53935', shadowBlur: 15, shadowColor: '#e53935' }
+            }
+        ]
+    });
+
+
+    // ----------- 2. 标签页面切换逻辑 -----------
+    
+    function toggleTheme() {
+        const body = document.body;
+        const currentTheme = body.getAttribute('data-theme') || 'dark';
+        
+        let newTheme, btnHtml;
+        if (currentTheme === 'dark') {
+            newTheme = 'light';
+            btnHtml = '<i class="fa-solid fa-moon"></i> 切换至珍珠白';
+        } else if (currentTheme === 'light') {
+            newTheme = 'pearl';
+            btnHtml = '<i class="fa-regular fa-gem"></i> 切换至暗色';
+        } else {
+            newTheme = 'dark';
+            btnHtml = '<i class="fa-solid fa-sun"></i> 切换至亮色';
+        }
+        
+        body.setAttribute('data-theme', newTheme);
+        document.getElementById('theme-btn').innerHTML = btnHtml;
+            
+        // 重新渲染图表颜色
+        setTimeout(() => {
+            let bgStr, textStr;
+            if (newTheme === 'light') { bgStr = '#ffffff'; textStr = '#263238'; }
+            else if (newTheme === 'pearl') { bgStr = '#fcfbf9'; textStr = '#4a4a4a'; }
+            else { bgStr = '#0d1117'; textStr = '#c9d1d9'; }
+            
+            graphChart.setOption({
+                backgroundColor: bgStr,
+                series: [{ label: { color: textStr } }]
+            });
+        }, 50);
+    }
+
+    function switchTab(view) {
+        document.getElementById('tab-dashboard').classList.remove('active');
+        document.getElementById('tab-graph').classList.remove('active');
+        document.getElementById('tab-' + view).classList.add('active');
+
+        if (view === 'dashboard') {
+            document.getElementById('view-dashboard').style.display = 'flex';
+            document.getElementById('view-graph').style.display = 'none';
+            // 保证图表正确撑满空间
+            setTimeout(() => { lineChart.resize(); globeChart.resize(); }, 50);
+        } else {
+            document.getElementById('view-dashboard').style.display = 'none';
+            document.getElementById('view-graph').style.display = 'block';
+            setTimeout(() => { graphChart.resize(); }, 50);
+        }
+    }
+
+
+    // ----------- 3. 综合后端数据获取 -----------
+    let streamInterval;
+    let trafficTimer; // 流量折线图绘图定时器
+    let normalStreamData = [];
+    let fraudStreamData = [];
+    let currentStats = { total_tx: 0, total_fraud_amt: 0, fraud_count: 0 };
+    let totalProcessed = 0; // 用于模拟不断增长的总处理量
+    let currentTickTraffic = 0; // 记录最近2秒内的流量频次
+    
+    // 用于真实顺序消费数据而不是随机重复
+    let normalCursor = 0;
+    let fraudCursor = 0;
+    
+    function getSimulatedAmount(id) {
+        return (id * 137 % 4900) + 100;
+    }
+
+    function togglePinned() {
+        const list = document.getElementById('pinned-list');
+        const icon = document.getElementById('pinned-icon');
+        if (list.style.display === 'none') {
+            list.style.display = 'block';
+            icon.className = 'fa-solid fa-chevron-up';
+        } else {
+            list.style.display = 'none';
+            icon.className = 'fa-solid fa-chevron-down';
+        }
+    }
+
+    // 顶部菜单栏交互功能建议
+    let isMonitoring = true;
+    function toggleMonitor() {
+        const menuBtn = document.getElementById('menu-monitor');
+        if (isMonitoring) {
+            clearInterval(streamInterval);
+            clearInterval(trafficTimer);
+            streamInterval = null;
+            trafficTimer = null;
+            isMonitoring = false;
+            menuBtn.innerHTML = '<i class="fa-solid fa-play"></i> 监控(已暂停)';
+            menuBtn.style.color = 'var(--warning)';
+        } else {
+            streamInterval = setInterval(pushToStream, 800);
+            trafficTimer = setInterval(updateTrafficChart, 2000);
+            isMonitoring = true;
+            menuBtn.innerHTML = '<i class="fa-solid fa-pause"></i> 监控(扫描中)';
+            menuBtn.style.color = '';
+        }
+    }
+
+    function exportReport() {
+        if(currentStats.fraud_count === 0) {
+            alert("目前尚未拦截到任何高危数据，暂无法导出！");
+            return;
+        }
+        alert(`数据已成功下载！\n\n【网盾安全报告】\n本次周期共处理数据 [ ${totalProcessed} ] 笔，\n累计命中并拦截高危欺诈交易 [ ${currentStats.fraud_count} ] 笔，\n实时挽回/防损资金总计 [ ¥ ${currentStats.total_fraud_amt.toLocaleString()} ]。`);
+    }
+
+    function createAlertItem(id, isFraud) {
+        const div = document.createElement('div');
+        div.className = 'alert-item';
+        const t = new Date(); 
+        
+        if (isFraud) {
+            div.onclick = () => {
+                document.querySelectorAll('.alert-item').forEach(el => el.classList.remove('active'));
+                div.classList.add('active');
+                runInvestigation(id);
+            };
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="id" style="color:var(--danger, #f14c4c);">TX_${id}</span>
+                    <span class="tag">高危挂起</span>
+                </div>
+                <div class="alert-time"><i class="fa-regular fa-clock"></i> ${t.toLocaleTimeString('en-US',{hour12:false})}</div>
+            `;
+        } else {
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="id" style="color:#888;">TX_${id}</span>
+                    <span class="tag-normal">静默放行</span>
+                </div>
+                <div class="alert-time"><i class="fa-regular fa-clock"></i> ${t.toLocaleTimeString('en-US',{hour12:false})}</div>
+            `;
+            div.style.padding = '5px 15px';
+            div.style.opacity = '0.6';
+            div.style.cursor = 'default';
+        }
+        return div;
+    }
+
+    function pushToStream() {
+        const streamContainer = document.getElementById('stream-list');
+        // 维持 15% 的几率抛出真实的高危节点，且保证数据池还有余量
+        let isFraud = Math.random() < 0.15 && fraudCursor < fraudStreamData.length;
+        
+        let idToPush = null;
+        if (isFraud) {
+            idToPush = fraudStreamData[fraudCursor];
+            fraudCursor++;
+        } else if (normalCursor < normalStreamData.length) {
+            idToPush = normalStreamData[normalCursor];
+            normalCursor++;
+        }
+        
+        // 如果数据都消费完了，为了不报错不再继续推送（或者你可以将游标清零循环）
+        if (!idToPush) return;
+
+        currentTickTraffic++; // 叠加当前2秒周期内的真实流量脉冲
+
+        const item = createAlertItem(idToPush, isFraud);
+        streamContainer.appendChild(item);
+
+        if (streamContainer.children.length > 15) {
+            streamContainer.removeChild(streamContainer.firstChild); // 保持流滚动
+        }
+        
+        // 如果是高级威胁，不仅仅走底部的流，还会被“钉”在上面的固定审计窗口
+        if (isFraud) {
+            const pinnedList = document.getElementById('pinned-list');
+            const dupItem = createAlertItem(idToPush, true);
+            pinnedList.insertBefore(dupItem, pinnedList.firstChild);
+            if (pinnedList.children.length > 30) {
+                pinnedList.removeChild(pinnedList.lastChild);
+            }
+            
+            // ================== 同步更新：黑产节点追踪雷达 ==================
+            const newNode = {
+                id: String(idToPush),
+                name: 'TX ' + idToPush,
+                value: [Math.random() * 100, Math.random() * 100], // 投射到散点图坐标系随机位置
+                symbolSize: Math.max(10, Math.min(25, getSimulatedAmount(idToPush) / 200)) // 涉案金额决定红点大小
+            };
+            radarNodes.push(newNode);
+
+            // 模拟黑产团伙案发关联：30% 几率与已存在的潜伏节点产生连接网络
+            if (radarNodes.length > 1 && Math.random() > 0.3) {
+                const targetIdx = Math.floor(Math.random() * (radarNodes.length - 1));
+                radarLinks.push({
+                    source: String(idToPush),
+                    target: radarNodes[targetIdx].id,
+                    lineStyle: { width: 1.5, curveness: 0.2, color: 'rgba(229, 57, 53, 0.4)' }
+                });
+            }
+
+            // 控制同屏渲染上限
+            if (radarNodes.length > 40) radarNodes.shift();
+            if (radarLinks.length > 60) radarLinks.shift();
+
+            globeChart.setOption({
+                series: [
+                    {}, // 略过底噪系列
+                    { data: radarNodes, links: radarLinks } // 覆写 Graph 系列数据
+                ]
+            });
+            // ================================================================
+
+            // 实时更新统计数据：拦截资金和发现节点
+            currentStats.fraud_count += 1;
+            currentStats.total_fraud_amt += getSimulatedAmount(idToPush);
+            document.getElementById('stat-amt').innerText = '¥ ' + currentStats.total_fraud_amt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-nodes').innerText = currentStats.fraud_count;
+        }
+        
+        // 实时更新统计数据：总吞吐量
+        totalProcessed += 1;
+        document.getElementById('stat-total').innerText = (currentStats.total_tx + totalProcessed).toLocaleString();
+        
+        // 动态计算审单率 (加上轻微的 0.01% - 0.05% 抖动让它看起来更真实)
+        const baseRate = 99.90;
+        const jitter = Math.random() * 0.08;
+        document.getElementById('stat-rate').innerText = (baseRate + jitter).toFixed(2) + '%';
+    }
+
+    function fetchRealData() {
+        fetch('http://127.0.0.1:8000/api/v1/dashboard_stats')
+        .then(res => res.json())
+        .then(data => {
+            if(data.error) return;
+            
+            // 只有在第一次加载时初始化，否则会引起数据突变从0开始
+            if (totalProcessed === 0 && currentStats.total_tx === 0) {
+                // 更新顶部栏 BANs 初值 (要求从0开始，完全由左侧流来带动真实增长)
+                currentStats = {
+                    total_tx: 0,
+                    total_fraud_amt: 0,
+                    fraud_count: 0
+                };
+                totalProcessed = 0;
+                
+                document.getElementById('stat-total').innerText = "0";
+                document.getElementById('stat-amt').innerText = '¥ 0.00';
+                document.getElementById('stat-nodes').innerText = "0";
+
+                // 初始化置顶的高危记录列表 (要求开始为空，让它随时间自然出现并钉住)
+                const pinnedList = document.getElementById('pinned-list');
+                if (pinnedList) {
+                    pinnedList.innerHTML = '';
+                }
+            }
+
+            // 追加数据，而不是直接覆盖清零，保证游标稳定
+            if (fraudStreamData.length === 0) {
+                fraudStreamData = data.real_alerts || [];
+                normalStreamData = data.normal_alerts || [];
+            }
+            
+            // 启动定时流水器
+            if(!streamInterval) {
+                streamInterval = setInterval(pushToStream, 800);
+            }
+            // 启动折线图脉冲渲染器 (每 2 秒吞吐统记一次绘制脉动)
+            if(!trafficTimer) {
+                trafficTimer = setInterval(updateTrafficChart, 2000);
+            }
+        }).catch(e => console.log(e));
+    }
+
+    // 更新中间上方流量折线图 (提取真实触发流水频率)
+    function updateTrafficChart() {
+        if (!isMonitoring) return;
+        timeData.shift();
+        timeData.push(new Date().toLocaleTimeString('en-US',{hour12:false}));
+        
+        trafficData.shift();
+        // 放大倍数使其在图上有较为明显的起伏，基数+真实计算出的2s内吐出的频次波动
+        trafficData.push(Math.floor(Math.random() * 3 + 2) + currentTickTraffic * 2);
+        currentTickTraffic = 0; // 计满重置
+
+        lineChart.setOption({
+            xAxis: { data: timeData },
+            series: [{ data: trafficData }]
+        });
+    }
+
+    // ----------- 4. 深度研判与图谱流 (原 Index) -----------
+    async function runInvestigation(txId) {
+        // 激活并显示 Graph 标签卡
+        const graphTab = document.getElementById('tab-graph');
+        graphTab.style.display = 'flex';
+        document.getElementById('graph-tab-title').innerText = `TX_${txId}_关系组.gnn`;
+        switchTab('graph');
+
+        const chat = document.getElementById('chat-window');
+        const actionZone = document.getElementById('action-zone');
+        chat.innerHTML = '';
+        actionZone.style.display = 'none';
+
+        // 模拟 DeepSeek Agent 思考过程
+        const thoughts = [
+            { agent: "哨兵🕵️‍♂️", msg: `介入高危流水 TX_${txId}，调取业务快照...` },
+            { agent: "侦探🔬", msg: "连接图数据库，挖掘设备/IP跨域网络..." },
+            { agent: "法官👨‍⚖️", msg: "构建 GNN 异构子图，请求 Qwen-Agent 研判..." }
+        ];
+
+        for (let t of thoughts) {
+            const thoughtDiv = document.createElement('div');
+            thoughtDiv.className = 'agent-thought';
+            thoughtDiv.innerHTML = `[${t.agent}] ${t.msg}`;
+            chat.appendChild(thoughtDiv);
+            chat.scrollTop = chat.scrollHeight;
+            await new Promise(r => setTimeout(r, 600)); 
+        }
+
+        // 调用推理侧后端
+        fetch('http://127.0.0.1:8000/api/v1/predict', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({transaction_id: txId})
+        }).then(res => res.json()).then(data => {
+            allNodes = data.graph_data.nodes;
+            allLinks = data.graph_data.links;
+            renderGraph();
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message';
+            aiMsg.innerHTML = marked.parse(data.analysis_report);
+            chat.appendChild(aiMsg);
+            chat.scrollTop = chat.scrollHeight;
+
+            actionZone.style.display = 'block';
+        }).catch(() => {
+             const err = document.createElement('div');
+             err.className = 'ai-message';
+             err.innerHTML = "<span style='color:var(--danger)'>调用大模型失败，请确保后台在运行。</span>";
+             chat.appendChild(err);
+        });
+    }
+
+    function renderGraph() {
+        graphChart.setOption({
+            backgroundColor: '#161616',
+            series: [{
+                type: 'graph', layout: 'force', roam: true, draggable: true,
+                label: { show: true, position: 'bottom', color: '#fff', fontSize: 10 },
+                data: allNodes, links: allLinks,
+                categories: [{name:'关联'}, {name:'核心'}, {name:'网络'}, {name:'介质'}],
+                force: { repulsion: 600, edgeLength: [80, 150] },
+                lineStyle: { color: '#444', curveness: 0.1, opacity: 0.8 }
+            }]
+        });
+    }
+
+    function executeBlock() {
+        // 创建一个全屏阻断终端动画层
+        const overlay = document.createElement('div');
+        overlay.id = 'kill-chain-overlay';
+        overlay.innerHTML = `
+            <div class="kill-modal">
+                <h2 style="color:var(--danger); border-bottom:1px solid #333; padding-bottom:12px; margin:0;">
+                    <i class="fa-solid fa-triangle-exclamation blink"></i> 授权 AI 防御与资产冻结预案
+                </h2>
+                <div class="kill-console" id="kill-console"></div>
+                <div style="margin-top:20px; text-align:right;">
+                    <button class="btn-execute" id="btn-confirm-kill">确认授权并静默执行</button>
+                    <button class="btn-execute" id="btn-cancel-kill" style="margin-left:15px; background:#333; color:#fff;">取消阻断</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('btn-cancel-kill').onclick = () => {
+            document.body.removeChild(overlay);
+        };
+
+        const consoleDiv = document.getElementById('kill-console');
+        consoleDiv.innerHTML = "<div>Waiting for operator authorization...</div>";
+
+        document.getElementById('btn-confirm-kill').onclick = () => {
+            // 隐藏按钮进入无交互动画执行态
+            document.getElementById('btn-confirm-kill').style.display = 'none';
+            document.getElementById('btn-cancel-kill').style.display = 'none';
+            
+            // 模拟高科黑客/网警终端命令流
+            const logs = [
+                "> [ACTION] 正在下发生态级阻断策略...",
+                "> [TARGET] 锁定核心黑产主账户及 5 个高危二层洗钱跳板节点",
+                "> [NETWORK] 成功下发BGP/网关隔离规则，切断所有异常出款通道 (TCP/RST)...",
+                "> [<span style='color:var(--warning)'>█#########</span>] 15% - 涉案账户临时止付冻结完成",
+                "> [<span style='color:var(--warning)'>████######</span>] 45% - Oauth网银授权凭证已吊销清洗",
+                "> [<span style='color:var(--warning)'>████████##</span>] 80% - 图谱网络特征码已打入反诈黑库",
+                "> [<span style='color:var(--success)'>██████████</span>] 100% - 团伙资金通路物理级隔离瘫痪成功！",
+                "> [REPORT] 资产保全结束。已同步当地反电诈中心。系统即刻刷新拓扑图谱表征..."
+            ];
+
+            let step = 0;
+            consoleDiv.innerHTML = "";
+            let logInterval = setInterval(() => {
+                if (step < logs.length) {
+                    consoleDiv.innerHTML += `<div>${logs[step]}</div>`;
+                    consoleDiv.scrollTop = consoleDiv.scrollHeight; // 滚动到底部
+                    step++;
+                } else {
+                    clearInterval(logInterval);
+                    // 演示停顿 1.5s 后销毁遮罩并更新主视图
+                    setTimeout(() => {
+                        document.body.removeChild(overlay);
+                        performVisualBlock();
+                    }, 1500);
+                }
+            }, 550); // 每一行执行的仿真延迟
+        };
+    }
+
+    function performVisualBlock() {
+        // 重写主绘图区 Graph 图的节点与边表现，使其具备“断开”说服力
+        let frozenCount = 0;
+        allNodes.forEach(n => {
+            // 找出恶意核心网络
+            if (n.category === 0 || n.category === 1) { 
+                n.itemStyle = { 
+                    color: '#1a1a1a',          // 发黑死亡色
+                    borderColor: '#ff0000',    // 红外边
+                    borderWidth: 2, 
+                    borderType: 'dashed' 
+                };
+                if (!n.name.includes("【高危】")) {
+                    n.name += " \\n【已阻断隔离】";
+                }
+                n.symbolSize = Math.max(10, n.symbolSize * 0.7); // 缩头
+                frozenCount++;
+            }
+        });
+        
+        // 切断连接线：使它们的样式变灰并显示成虚线
+        allLinks = allLinks.map(link => {
+            return {
+                ...link,
+                lineStyle: {
+                    color: '#222',       // 死亡灰
+                    type: 'dotted',      // 虚线化
+                    opacity: 0.4,
+                    width: 1
+                }
+            };
+        });
+
+        // 重新渲染图表
+        renderGraph();
+
+        // 同时改变右侧小助手界面的内容和操作区
+        const chatWindow = document.getElementById('chat-window');
+        chatWindow.innerHTML += `
+            <div class="ai-message" style="margin-top:20px; background: rgba(229, 57, 53, 0.1); border-color: var(--danger);">
+                <span class="sender"><i class="fa-solid fa-shield-halved" style="color:var(--danger)"></i> 阻断反馈中心</span>
+                <div style="font-size: 13px; line-height: 1.6; color: #fff;">
+                    <strong>[ 阻断与隔离生效报告 ]</strong><br>
+                    <span style="color:var(--success);">▶</span> 目标团伙资金通路已强行熔断。<br>
+                    <span style="color:var(--success);">▶</span> 核心 ${frozenCount} 个异常账户进入黑洞路由 (虚线红边)。<br>
+                    <span style="color:var(--success);">▶</span> 所有关联子网络连接已被虚拟瘫痪回收 (点状暗灰虚线)。
+                </div>
+            </div>
+        `;
+        const actionZone = document.getElementById('action-zone');
+        actionZone.innerHTML = `<button class="btn-execute" style="background:#555; color:#aaa; cursor:not-allowed;" disabled><i class="fa-solid fa-lock"></i> 威胁已解除，安全态势升级</button>`;
+    }
+
+    // 初始化任务与窗体监听
+    window.onload = function() {
+        fetchRealData();
+        // setInterval(fetchRealData, 30000); // 移除 30 秒定期刷新的设定，防止已入队列的数据和统计被重置
+    }
+    
+    window.onresize = () => {
+        graphChart.resize();
+        lineChart.resize();
+        globeChart.resize();
+    };
+</script>
+
+</body>
+</html>
